@@ -5,47 +5,101 @@ using std::endl;
 
 namespace haizei{
 
+template<typename Value>
 struct TreeNode {
-    int val;
+    Value val;
     TreeNode *lchild, *rchild, *parent;
-    TreeNode(int val, TreeNode*parent):val(val), lchild(nullptr), rchild(nullptr), parent(parent){}
+    TreeNode(Value val, TreeNode* parent):val(val), lchild(nullptr), rchild(nullptr), parent(parent){}
 };
 
+template<typename Value>
 class BinarySearchTreeHelper {
-private:
-    static TreeNode* right_most(TreeNode *node) {
+    using TreeNodePtr = TreeNode<Value>* ;
+public:
+    static TreeNodePtr right_most(TreeNodePtr node) {
         while (node->rchild != nullptr) node = node->rchild;
         return node;
     }
-    static TreeNode* left_most(TreeNode *node) {
+    static TreeNodePtr left_most(TreeNodePtr node) {
         while (node->lchild != nullptr) node = node->lchild;
         return node;
     }
-public:
-    static TreeNode* decreament(TreeNode *node) {
+    static TreeNodePtr decreament(TreeNodePtr *node) {
         if (node->lchild != nullptr) return right_most(node->lchild);
         while (node->parent != node && node->parent->lchild == node) node = node->parent;
         return node->parent;
     } 
-    static TreeNode* increament(TreeNode *node) {
+    static TreeNodePtr increament(TreeNodePtr node) {
         if (node->rchild != nullptr) return left_most(node->rchild);
         while (node->parent != node && node->parent->rchild == node) node = node->parent;
         return node->parent;        
     }
 };
 
+template<typename Value>
+class IteratorImpl {
+    using ref = Value&;
+    using ptr = Value*;
+    using TreeNodePtr = TreeNode<Value>* ;
+    using helper = BinarySearchTreeHelper<Value>;
+    TreeNodePtr node;
+public:
+    IteratorImpl(TreeNodePtr node) : node(node) {}
+
+    ref operator *() {
+        return node->val;
+    }
+
+    ptr operator ->() {
+        return &(this->node->val);
+    }
+
+    IteratorImpl & operator ++() {
+        node = helper::increament(node);
+        return *this;
+    }
+
+    IteratorImpl operator ++(int) {
+        IteratorImpl old = *this;
+        ++(*this);
+        return old;
+    }
+
+    IteratorImpl & operator --() {
+        node = helper::decreament(node);
+        return *this;
+    }
+
+    IteratorImpl operator --(int) {
+        IteratorImpl old = *this;
+        --(*this);
+        return old;
+    }
+
+    bool operator == (const IteratorImpl& b) {
+        return this->node == b.node;
+    }
+
+    bool operator != (const IteratorImpl& b) {
+        return this->node != b.node;
+    }
+};
+
+template<typename Value>
 class BinarySearchTree {
 private:
-    using Nodeptr = TreeNode*;
-    using Helper = BinarySearchTreeHelper;
+    using Nodeptr = TreeNode<Value>*;
+    using Node = TreeNode<Value>;
+    using Helper = BinarySearchTreeHelper<Value>;
     using parentAndNodeptrs = std::pair<Nodeptr, Nodeptr>;
+    using iterator = IteratorImpl<Value>;
 
-    TreeNode vHead;
+    Node vHead;
 
     inline Nodeptr& root() {return vHead.lchild;}
 
-    inline bool insert_node(Nodeptr root, int val) {
-        Nodeptr new_node = new TreeNode(val, root);
+    inline bool insert_node(Nodeptr root, Value val) {
+        Nodeptr new_node = new Node(val, root);
         if (val < root->val) root->lchild = new_node;
         else root->rchild = new_node;
         return true;
@@ -68,7 +122,7 @@ private:
         ouputimpl(root->rchild);
     }
 
-    parentAndNodeptrs findParentAndNode(int val) {
+    parentAndNodeptrs findParentAndNode(Value val) {
         if (root() == nullptr) return std::make_pair(&vHead, nullptr);
         Nodeptr p = root(),parent = root()->parent;
         while(p != nullptr && val != p->val) {
@@ -82,9 +136,9 @@ private:
 public:
     BinarySearchTree (): vHead(-1, nullptr) {vHead.parent = &vHead;}
 
-    bool insert(int val) {
+    bool insert(Value val) {
         if (root() == nullptr) {
-            root() = new TreeNode(val, &vHead);
+            root() = new Node(val, &vHead);
             return true;
         }
         parentAndNodeptrs p = findParentAndNode(val);
@@ -92,7 +146,7 @@ public:
         return insert_node(p.first, val);
     }
 
-    bool erase(int val) {
+    bool erase(Value val) {
         Nodeptr node = findParentAndNode(val).second;
         if (node == nullptr) return false;
         if (node->lchild == nullptr || node->rchild == nullptr) {
@@ -105,7 +159,7 @@ public:
         }
     }
 
-    int find(int val) {
+    int find(Value val) {
         Nodeptr tmp = findParentAndNode(val).second;
         if (tmp == nullptr) return -1;
         else return tmp->val;
@@ -113,8 +167,18 @@ public:
 
     void output() {
         cout << "Tree: ";
-        ouputimpl(root());
+        for (iterator it = begin(); it != end(); it++) {
+            cout << *(it) << " ";
+        }
         cout << endl;
+    }
+
+    iterator begin() {
+        return iterator(Helper::left_most(root()));
+    }
+
+    iterator end() {
+        return iterator(&vHead);
     }
 
 };
@@ -123,16 +187,34 @@ public:
 
 using namespace haizei;
 
+using std::ostream;
+
+struct Node {
+    int val;
+    Node (int val):val(val) {}
+    friend ostream& operator << (ostream& out, const Node&node) {
+        return out << node.val;
+    }
+    bool operator < (const Node & node) {
+        return val < node.val;
+    }
+    bool operator > (const Node & node) {
+        return val > node.val;
+    }
+    bool operator == (const Node & node) {
+        return val == node.val;
+    }
+    bool operator != (const Node & node) {
+        return val != node.val;
+    }
+};
+
 int main() {
-    BinarySearchTree tree;
+    BinarySearchTree<Node> tree;
     srand(time(0));
     for (int i = 0; i < 100; i++) {
-        tree.insert(rand() % 100);
+        tree.insert(Node(rand() % 100));
     }
-    for (int i = 0; i < 100; i++) {
-        int val = rand() % 100;
-        cout << "erase " << val << " " << tree.erase(val) << endl;
-        tree.output();
-    }
+    tree.output();
     return 0;
 }
