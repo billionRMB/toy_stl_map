@@ -1,0 +1,135 @@
+#include <iostream>
+using namespace std;
+
+namespace haizei{
+
+struct TreeNode {
+    int value;
+    TreeNode *lchild, *rchild, *parent;
+    TreeNode *& plchild() {return parent->lchild;}
+    TreeNode *& prchild() {return parent->rchild;}
+    TreeNode (int val = 0, TreeNode *parent = nullptr) : value(val), lchild(nullptr), rchild(nullptr), parent(parent) {}
+};
+
+class BinarySearchTreeIteratorImpl {
+
+};
+
+class Binary_search_tree {
+public:
+    using pTreeNode = TreeNode *;
+    using iterator = BinarySearchTreeIteratorImpl;
+
+    Binary_search_tree() {}
+
+    bool insert(int value) {
+        if (vRoot.lchild == nullptr) {
+            vRoot.lchild = new TreeNode(value, nullptr);
+            return true;
+        }
+        pTreeNode p = root();
+        for(;;) {
+            if (value < p->value) {
+              if (p->lchild) p = p->lchild;
+              else break;
+            }
+            if (value > p->value){
+               if (p->rchild) p = p->rchild;
+               else break;
+            }
+            if (value == p->value) return false;
+        }
+        pTreeNode new_node = new TreeNode(value, p);
+        value < p->value ? p->lchild : p->rchild = new_node;
+        return true;
+    }
+
+    pTreeNode find(int value) {
+        return find(root(), value);
+    }
+
+    bool erase(int value) {
+        pTreeNode p = find(value);
+
+        if (p == nullptr) return false;
+
+        if (p->lchild == nullptr || p->rchild == nullptr) {
+            deleteSingleNode(p);
+            return true;
+        } else {
+            pTreeNode tmp = descreament(p->lchild);
+            p->value = tmp->value;
+            deleteSingleNode(tmp);
+            return true;
+        }
+        return true;
+    }
+
+private:
+    TreeNode vRoot;
+
+    void deleteSingleNode(pTreeNode p) {
+            (p->parent->lchild == p ? p->parent->lchild : p->parent->rchild) 
+                = (p->lchild ? p->lchild : p->rchild);
+            delete p;
+    }
+
+    static pTreeNode descreament(pTreeNode root) {
+        if (root->lchild) return Binary_search_tree::rightMost(root->lchild);
+        while (root->parent != root && root->plchild() == root) root = root->parent;
+        return root;
+    }
+
+    static pTreeNode increament(pTreeNode root) {
+        if (root->rchild) return Binary_search_tree::leftMost(root); 
+        while (root->parent != root && root->prchild() == root) root = root->parent;
+        return root;
+    }
+
+    static pTreeNode rightMost(pTreeNode root) {
+        while(root->rchild) root = root->rchild;
+        return root;
+    }
+
+    static pTreeNode leftMost(pTreeNode root) {
+        while(root->rchild) root = root->rchild;
+        return root;
+    }
+    
+    pTreeNode begin() {
+        return Binary_search_tree::leftMost(root());
+    }
+
+    pTreeNode end() {
+        return &vRoot;
+    }
+
+    pTreeNode root() {
+        return vRoot.lchild;
+    }
+
+    pTreeNode find(pTreeNode root, int value) {
+        pTreeNode p = root;
+        while (p) {
+            if (value < p->value) p = p->lchild;
+            else if (value > p->value) p = p->rchild;
+            else return p;
+        }
+        return nullptr;
+    }
+
+};
+
+}
+
+using namespace haizei;
+
+int main() {
+    srand(time(0));
+    Binary_search_tree map;
+    for (int i = 0;i < 10;i ++) {
+        map.insert(rand() % 100);
+    }
+    return 0;
+}
+
