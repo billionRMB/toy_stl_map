@@ -5,16 +5,15 @@ using std::endl;
 
 namespace haizei{
 
-template<typename Value>
-struct TreeNode {
-    Value val;
-    TreeNode *lchild, *rchild, *parent;
-    TreeNode(Value val, TreeNode* parent):val(val), lchild(nullptr), rchild(nullptr), parent(parent){}
+struct TreeNodeBase {
+    TreeNodeBase *lchild, *rchild, *parent;
+    TreeNodeBase(TreeNodeBase *parent_ = nullptr) :lchild(nullptr), rchild(nullptr),  parent(parent_) {}
+    ~TreeNodeBase() {}
 };
 
-template<typename Value>
 class BinarySearchTreeHelper {
-    using TreeNodePtr = TreeNode<Value>* ;
+    using TreeNodePtr = TreeNodeBase* ;
+
 public:
     static TreeNodePtr right_most(TreeNodePtr node) {
         while (node->rchild != nullptr) node = node->rchild;
@@ -24,7 +23,7 @@ public:
         while (node->lchild != nullptr) node = node->lchild;
         return node;
     }
-    static TreeNodePtr decreament(TreeNodePtr *node) {
+    static TreeNodePtr decreament(TreeNodePtr node) {
         if (node->lchild != nullptr) return right_most(node->lchild);
         while (node->parent != node && node->parent->lchild == node) node = node->parent;
         return node->parent;
@@ -37,12 +36,21 @@ public:
 };
 
 template<typename Value>
+struct TreeNode : public TreeNodeBase {
+    Value val;
+    TreeNode(const Value& val, TreeNode* parent_) : TreeNodeBase(parent_), val(val) {}
+};
+
+template<typename Value>
 class IteratorImpl {
     using ref = Value&;
-    using ptr = Value*;
+    using ptr =  Value*;
     using TreeNodePtr = TreeNode<Value>* ;
-    using helper = BinarySearchTreeHelper<Value>;
+    using helper = BinarySearchTreeHelper;
+
+private:
     TreeNodePtr node;
+
 public:
     IteratorImpl(TreeNodePtr node) : node(node) {}
 
@@ -54,8 +62,8 @@ public:
         return &(this->node->val);
     }
 
-    IteratorImpl & operator ++() {
-        node = helper::increament(node);
+    IteratorImpl& operator ++() {
+        node = static_cast<TreeNode<Value>*>(helper::increament(node));
         return *this;
     }
 
@@ -65,12 +73,12 @@ public:
         return old;
     }
 
-    IteratorImpl & operator --() {
+    IteratorImpl& operator --() {
         node = helper::decreament(node);
         return *this;
     }
 
-    IteratorImpl operator --(int) {
+    IteratorImpl& operator --(int) {
         IteratorImpl old = *this;
         --(*this);
         return old;
@@ -85,34 +93,44 @@ public:
     }
 };
 
-template<typename Value>
+template<typename Key, typename KeyValue >
 class BinarySearchTree {
-private:
-    using Nodeptr = TreeNode<Value>*;
+
+    using Value = std::pair<Key, KeyValue>;
+
     using Node = TreeNode<Value>;
-    using Helper = BinarySearchTreeHelper<Value>;
+    using Nodeptr = Node*;
+
+    using BaseNode = TreeNodeBase;
+    using BaseNodeptr = BaseNode*;
+
     using parentAndNodeptrs = std::pair<Nodeptr, Nodeptr>;
+
+    using Helper = BinarySearchTreeHelper;
     using iterator = IteratorImpl<Value>;
 
-    Node vHead;
+private:
+    Nodeptr vHead;
 
-    static int compareValues(const Value& a,const Value& b) {
+    static inline Key& getKey(Value &v) { return v.first; }
+
+    static int compareKeys(Key& a, Key& b) {
         if (b < a) return 1;
         else if (a < b) return -1;
         else return 0;
     }
 
-    inline Nodeptr& root() {return vHead.lchild;}
+    inline Nodeptr root() const {return static_cast<Nodeptr>(vHead->lchild);}
 
     inline bool insert_node(Nodeptr root, Value val) {
         Nodeptr new_node = new Node(val, root);
-        if (compareValues(val, root->val) == -1) root->lchild = new_node;
+        if (compareKeys(getKey(val), getKey(root->val)) == -1) root->lchild = new_node;
         else root->rchild = new_node;
         return true;
     }
 
-    bool delete_node(Nodeptr node) {
-        Nodeptr child = (node->lchild != nullptr ? 
+    inline bool delete_node(BaseNodeptr node) {
+        BaseNodeptr child = (node->lchild != nullptr ? 
                node->lchild : node->rchild);
         (node->parent->lchild == node ? 
          node->parent->lchild: node->parent->rchild) = child;
@@ -121,85 +139,131 @@ private:
         return true;
     }
 
-    parentAndNodeptrs findParentAndNode(Value val) {
-        if (root() == nullptr) return std::make_pair(&vHead, nullptr);
-        Nodeptr p = root(),parent = root()->parent;
-        while(p != nullptr && compareValues(val, p->val) != 0) {
+    parentAndNodeptrs findParentAndNode(Key key) {
+        if (root() == nullptr) 
+            return std::make_pair(vHead, nullptr);
+        int op;
+        Nodeptr p = root(), parent = vHead;
+        while(p != nullptr && (op = compareKeys(key, getKey(p->val))) != 0) {
             parent = p;
-            if (compareValues(val, p->val) == -1) p = p->lchild;
-            else if (compareValues(val, p->val) == 1) p = p->rchild;
+            if (op == -1) p = static_cast<Nodeptr>(p->lchild);
+            else if (op == 1) p = static_cast<Nodeptr>(p->rchild);
         }
         return std::make_pair(parent,p);
     }
 
 public:
-    BinarySearchTree (): vHead(-1, nullptr) {vHead.parent = &vHead;}
+    BinarySearchTree() {
+        vHead = (Nodeptr)malloc(sizeof(Node));
+        vHead->lchild = vHead->rchild = nullptr;
+        vHead->parent = vHead;
+    }
+
+    ~BinarySearchTree() {
+        free(vHead);
+    }
+
+    inline const iterator begin() const {
+        if (root() == nullptr) return end();
+        else return iterator(static_cast<Nodeptr>(Helper::left_most(root())));
+    }
+
+    inline const iterator end() const { return iterator(vHead); }
 
     bool insert(Value val) {
         if (root() == nullptr) {
-            root() = new Node(val, &vHead);
+            vHead->lchild = new Node(val, vHead);
             return true;
         }
-        parentAndNodeptrs p = findParentAndNode(val);
+        parentAndNodeptrs p = findParentAndNode(getKey(val));
         if (p.second != nullptr) return false;
         return insert_node(p.first, val);
     }
 
-    bool erase(Value val) {
-        Nodeptr node = findParentAndNode(val).second;
+    bool erase(Key key) {
+        Nodeptr node = findParentAndNode(key).second;
         if (node == nullptr) return false;
         if (node->lchild == nullptr || node->rchild == nullptr) {
             return delete_node(node);
         } else {
-            Nodeptr tmp = Helper::decreament(node);
+            Nodeptr tmp = static_cast<Nodeptr>(Helper::decreament(node));
             node->val = tmp->val;
             delete_node(tmp);
             return true;
         }
     }
 
-    int find(Value val) {
-        Nodeptr tmp = findParentAndNode(val).second;
+    bool erase(const iterator& it) { return erase(*(it)); }
+
+    Value& find(Key key) {
+        Nodeptr tmp = findParentAndNode(key).second;
         if (tmp == nullptr) return -1;
         else return tmp->val;
-    }
-
-    iterator begin() {
-        return iterator(Helper::left_most(root()));
-    }
-
-    iterator end() {
-        return iterator(&vHead);
     }
 
 };
 
 }
 
+// 迭代器设计是ｓｔｌ的一个重点
+// 结构与数值分离, 类型转换了
+// vHead 设计用来方便插入与删除, 同时设置为左孩子, 左闭合右开
+// 只重载小于号的设计
+
+/*      测试                */
+
+#include <map>
+using namespace std;
 using namespace haizei;
 
-using std::ostream;
-
 struct Node {
-    int val;
-    Node (int val):val(val) {}
-    friend ostream& operator << (ostream& out, const Node&node) {
-        return out << node.val;
-    }
+    int value, key;
+
+    Node (int val, int key):value(val), key(key) {}
+
     bool operator < (const Node & node) const {
-        return val < node.val;
+        return value < node.value;
+    }
+
+    friend ostream& operator<< (ostream& out, const Node & node) {
+        return out << node.value << "-" << node.key;
     }
 };
 
-int main() {
-    BinarySearchTree<Node> tree;
-    srand(time(0));
-    for (int i = 0; i < 100; i++) {
-        tree.insert(Node(rand() % 100));
-    }
+template<typename T>
+void outputIterator(const T & tree) {
+    cout << "Start:";
     for (auto it = tree.begin(); it != tree.end(); it++) {
-        cout << *(it) << " ";
+        cout << "( " << it->first << "," << it->second.key  << " ) ";
     }
     cout << endl;
+}
+
+void output() {}
+template<typename T, typename ...Args>
+void output(const T &a, Args... args) {
+    outputIterator(a);
+    output(args...);
+}
+
+#define doThameThing(a, b, things) {a.things;b.things;}
+
+int main() {
+    srand(time(0));
+
+    BinarySearchTree<int, Node> tree;
+    map<int, Node> m;
+
+    for (int i = 0; i < 10; i++) {
+        int val = rand() % 10;
+        doThameThing(tree, m, insert(make_pair(val, Node(i, i))));
+    }
+
+    output(tree, m);
+
+    for (int i = 0; i < 10; i++) {
+        doThameThing(tree, m, erase(i));
+        output(tree, m);
+    }
     return 0;
 }
