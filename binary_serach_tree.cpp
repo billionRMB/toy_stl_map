@@ -96,11 +96,17 @@ private:
 
     Node vHead;
 
+    static int compareValues(const Value& a,const Value& b) {
+        if (b < a) return 1;
+        else if (a < b) return -1;
+        else return 0;
+    }
+
     inline Nodeptr& root() {return vHead.lchild;}
 
     inline bool insert_node(Nodeptr root, Value val) {
         Nodeptr new_node = new Node(val, root);
-        if (val < root->val) root->lchild = new_node;
+        if (compareValues(val, root->val) == -1) root->lchild = new_node;
         else root->rchild = new_node;
         return true;
     }
@@ -115,20 +121,13 @@ private:
         return true;
     }
 
-    void ouputimpl(Nodeptr root) {
-        if (root == nullptr) return;
-        ouputimpl(root->lchild);
-        cout << root->val << " ";
-        ouputimpl(root->rchild);
-    }
-
     parentAndNodeptrs findParentAndNode(Value val) {
         if (root() == nullptr) return std::make_pair(&vHead, nullptr);
         Nodeptr p = root(),parent = root()->parent;
-        while(p != nullptr && val != p->val) {
+        while(p != nullptr && compareValues(val, p->val) != 0) {
             parent = p;
-            if (val < p->val) p = p->lchild;
-            else if (val > p->val) p = p->rchild;
+            if (compareValues(val, p->val) == -1) p = p->lchild;
+            else if (compareValues(val, p->val) == 1) p = p->rchild;
         }
         return std::make_pair(parent,p);
     }
@@ -165,14 +164,6 @@ public:
         else return tmp->val;
     }
 
-    void output() {
-        cout << "Tree: ";
-        for (iterator it = begin(); it != end(); it++) {
-            cout << *(it) << " ";
-        }
-        cout << endl;
-    }
-
     iterator begin() {
         return iterator(Helper::left_most(root()));
     }
@@ -195,17 +186,8 @@ struct Node {
     friend ostream& operator << (ostream& out, const Node&node) {
         return out << node.val;
     }
-    bool operator < (const Node & node) {
+    bool operator < (const Node & node) const {
         return val < node.val;
-    }
-    bool operator > (const Node & node) {
-        return val > node.val;
-    }
-    bool operator == (const Node & node) {
-        return val == node.val;
-    }
-    bool operator != (const Node & node) {
-        return val != node.val;
     }
 };
 
@@ -215,6 +197,9 @@ int main() {
     for (int i = 0; i < 100; i++) {
         tree.insert(Node(rand() % 100));
     }
-    tree.output();
+    for (auto it = tree.begin(); it != tree.end(); it++) {
+        cout << *(it) << " ";
+    }
+    cout << endl;
     return 0;
 }
